@@ -4,112 +4,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>70s Bypass</title>
+    <title>70s Pro Alarm</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: center; overflow: hidden; }
-        #timer { font-size: 110px; font-weight: bold; color: #34C759; margin-bottom: 20px; font-variant-numeric: tabular-nums; }
-        .btn { padding: 25px; width: 80%; font-size: 22px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; }
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
+        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
+        .btn { padding: 30px; width: 80%; font-size: 24px; border-radius: 25px; border: none; font-weight: bold; cursor: pointer; }
         #startBtn { background: #007AFF; color: white; }
         #stopBtn { background: #FF3B30; color: white; display: none; }
-        
-        /* The Instruction Overlay (Stays until installed) */
-        #install-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
-        }
-        .card { background: #1c1c1e; padding: 30px; border-radius: 25px; border: 1px solid #333; width: 90%; }
-        b { color: #007AFF; }
-
-        /* Small visual pulse to confirm the app is "Alive" */
-        #heartbeat { position: fixed; bottom: 10px; right: 10px; width: 6px; height: 6px; background: #222; border-radius: 50%; }
+        #status { font-size: 12px; color: #444; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-    <div id="install-overlay">
-        <div class="card">
-            <h2>Step 1: Install</h2>
-            <p>To bypass <b>Low Power Mode</b> sleep, you MUST:</p>
-            <p>1. Tap <b>Share</b> (square icon)</p>
-            <p>2. Tap <b>"Add to Home Screen"</b></p>
-            <p>3. Open the app from your home screen.</p>
-        </div>
-    </div>
+    <div id="timer">01:10</div>
+    <button id="startBtn" class="btn" onclick="startBypass()">START ALARM</button>
+    <button id="stopBtn" class="btn" onclick="stopAlarm()">STOP ALARM</button>
+    <div id="status">Bypass: Inactive</div>
 
-    <div id="main">
-        <div id="timer">01:10</div>
-        <button id="startBtn" class="btn" onclick="startBypass()">START 70s TIMER</button>
-        <button id="stopBtn" class="btn" onclick="stopEverything()">STOP ALARM</button>
-    </div>
-
-    <canvas id="c" width="10" height="10" style="position:fixed; opacity:0.01; pointer-events:none;"></canvas>
-    <div id="heartbeat"></div>
-
-    <video id="v" playsinline loop muted style="position:absolute; width:1px; height:1px; opacity:0.01;">
-        <source src="https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-480p-30s/master/video.mp4" type="video/mp4">
-    </video>
-    <audio id="a" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
+    <audio id="heartbeat" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" loop></audio>
+    <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
 
     <script>
-        // Check if opened from Home Screen
-        const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-        if (!isStandalone && /iPhone|iPod/.test(navigator.userAgent)) {
-            document.getElementById('install-overlay').style.display = 'flex';
-        }
-
-        let timeLeft = 70; // 70 Seconds
-        let timerId = null;
-        const v = document.getElementById('v');
-        const a = document.getElementById('a');
-        const timerText = document.getElementById('timer');
-        const ctx = document.getElementById('c').getContext('2d');
+        var timeLeft = 70;
+        var timerId = null;
+        var heartbeat = document.getElementById('heartbeat');
+        var alarm = document.getElementById('alarm');
+        var timerText = document.getElementById('timer');
 
         function startBypass() {
-            // 1. Force Screen On via Video and Canvas
-            v.play();
-            function gpuLoop() {
-                ctx.fillStyle = Math.random() > 0.5 ? '#111' : '#000';
-                ctx.fillRect(0, 0, 10, 10);
-                requestAnimationFrame(gpuLoop);
-            }
-            gpuLoop();
-
-            // 2. Setup Media Session (LPM Bypass)
-            if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({ title: "70s Alarm Active" });
-            }
-
-            // 3. Unlock Audio
-            a.play(); a.pause();
-
             document.getElementById('startBtn').style.display = 'none';
-            timerId = setInterval(() => {
+            document.getElementById('status').innerText = "BYPASS ACTIVE: DO NOT LOCK";
+
+            // 1. Start Silent "Music" Heartbeat (The real bypass)
+            heartbeat.play();
+            
+            // 2. Set Media Metadata (Tells iOS this is a high-priority task)
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: "70s Alarm Running",
+                    artist: "Power Bypass"
+                });
+            }
+
+            // 3. Start Timer
+            timerId = setInterval(function() {
                 if (timeLeft > 0) {
                     timeLeft--;
-                    updateDisplay();
+                    var m = Math.floor(timeLeft / 60);
+                    var s = timeLeft % 60;
+                    timerText.innerText = m + ":" + (s < 10 ? '0' : '') + s;
                 } else {
-                    triggerAlarm();
+                    trigger();
                 }
             }, 1000);
         }
 
-        function updateDisplay() {
-            const m = Math.floor(timeLeft / 60);
-            const s = timeLeft % 60;
-            timerText.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-        }
-
-        function triggerAlarm() {
+        function trigger() {
             timerText.innerText = "0:00";
             timerText.style.color = "#FF3B30";
             document.getElementById('stopBtn').style.display = 'inline-block';
-            a.play(); // Continuous beep
-            if (navigator.vibrate) navigator.vibrate([500, 500, 500]);
+            alarm.play(); // Infinite beeping
+            heartbeat.pause(); // Switch from silence to alarm
         }
 
-        function stopEverything() {
-            location.reload(); // Hard reset is safest on iPhone 7
+        function stopAlarm() {
+            location.reload(); // Hard reset for iPhone 7 stability
         }
     </script>
 </body>
