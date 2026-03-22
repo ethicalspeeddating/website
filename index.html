@@ -3,90 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Countdown</title>
+    <title>Lite Timer</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#000000">
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        #controls { text-align: center; z-index: 10; }
-        input { font-size: 2rem; width: 80px; text-align: center; border-radius: 10px; border: none; padding: 10px; margin: 10px; }
-        button { font-size: 1.5rem; padding: 15px 30px; border-radius: 50px; border: none; background: #007AFF; color: white; cursor: pointer; }
-        canvas { display: none; } /* Programmatic source */
-        video { width: 100vw; height: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; padding-top: 20%; }
+        #timer { font-size: 80px; font-weight: bold; margin: 20px 0; }
+        button { padding: 20px 40px; font-size: 20px; border-radius: 15px; border: none; background: #007AFF; color: white; }
+        #status { color: #888; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="controls">
-        <h1>Set Timer</h1>
-        <input type="number" id="minutes" value="5" min="1"> Mins<br>
-        <button id="startBtn">START PWA ALARM</button>
+    <div id="setup">
+        <input type="number" id="mins" value="5" style="font-size:30px; width:60px; text-align:center;"> Mins<br><br>
+        <button id="startBtn">START ALARM</button>
     </div>
 
-    <canvas id="canvas" width="640" height="360"></canvas>
-    <video id="outputVideo" playsinline muted autoplay></video>
-    <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+    <div id="display" style="display:none;">
+        <div id="timer">05:00</div>
+        <div id="status">Screen Lock Active</div>
+    </div>
+
+    <video id="wakeVideo" playsinline loop muted style="position:absolute; width:1px; height:1px; opacity:0.01;">
+        <source src="https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-480p-30s/master/video.mp4" type="video/mp4">
+    </video>
+    <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const video = document.getElementById('outputVideo');
-        const audio = document.getElementById('alarmSound');
         const startBtn = document.getElementById('startBtn');
-        const minsInput = document.getElementById('minutes');
+        const timerText = document.getElementById('timer');
+        const video = document.getElementById('wakeVideo');
+        const audio = document.getElementById('alarm');
 
         let timeLeft = 0;
-        let timerId = null;
 
-        // 1. Programmatically draw the "Video" frames
-        function drawFrame() {
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const m = Math.floor(timeLeft / 60);
-            const s = timeLeft % 60;
-            const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+        startBtn.onclick = () => {
+            timeLeft = document.getElementById('mins').value * 60;
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('display').style.display = 'block';
 
-            ctx.fillStyle = "white";
-            ctx.font = "bold 150px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(timeStr, canvas.width / 2, canvas.height / 2 + 50);
-        }
+            // 1. Force the video and audio to "Unlock"
+            video.play().catch(e => console.log("Video wait"));
+            audio.play(); audio.pause();
 
-        async function startApp() {
-            timeLeft = parseInt(minsInput.value) * 60;
-            document.getElementById('controls').style.display = 'none';
+            // 2. Simple Wake Lock (If supported)
+            if (navigator.wakeLock) {
+                navigator.wakeLock.request('screen').catch(() => {});
+            }
 
-            // 2. Create Video Stream from Canvas
-            const stream = canvas.captureStream(30); // 30 FPS
-            video.srcObject = stream;
-            video.play();
-
-            // 3. Audio / Wake Lock Init
-            audio.play(); audio.pause(); // Unlock audio
-            if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
-
-            // 4. Run Countdown
-            timerId = setInterval(() => {
+            // 3. The Countdown (Separated so it doesn't freeze)
+            const countdown = setInterval(() => {
                 timeLeft--;
-                drawFrame();
+                
+                const m = Math.floor(timeLeft / 60);
+                const s = timeLeft % 60;
+                timerText.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
 
                 if (timeLeft <= 0) {
-                    clearInterval(timerId);
                     audio.play();
-                    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+                    timeLeft = document.getElementById('mins').value * 60; // Reset
+                    if (navigator.vibrate) navigator.vibrate(500);
                 }
             }, 1000);
-            
-            drawFrame();
-        }
-
-        startBtn.onclick = startApp;
-
-        // Service Worker Registration for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
+        };
     </script>
 </body>
 </html>
