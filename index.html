@@ -4,72 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>70s Synth Alarm</title>
+    <title>70s Audio Bypass</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
-        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; justify-content: center; overflow: hidden; }
+        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; font-variant-numeric: tabular-nums; }
         .btn { padding: 25px; width: 90%; font-size: 20px; border-radius: 20px; border: none; font-weight: bold; margin: 10px auto; cursor: pointer; }
         #testBtn { background: #444; color: white; }
         #startBtn { background: #007AFF; color: white; }
         #stopBtn { background: #FF3B30; color: white; display: none; }
-        #install-note { background: #1c1c1e; padding: 15px; border-radius: 15px; font-size: 13px; color: #888; border: 1px solid #333; }
+        .status { color: #888; font-size: 13px; margin-top: 15px; }
     </style>
 </head>
 <body>
 
     <div id="timer">01:10</div>
 
-    <div id="ui">
-        <div id="install-note">
-            <b>REQUIRED:</b> Tap <b>Share</b> > <b>Add to Home Screen</b>. <br>The alarm will NOT work inside the Safari app.
-        </div>
-        <button id="testBtn" class="btn" onclick="testTone()">1. TEST LOUD TONE</button>
-        <button id="startBtn" class="btn" onclick="startAlarm()">2. START 70s TIMER</button>
+    <div id="setup">
+        <button id="testBtn" class="btn" onclick="testTone()">1. TEST SOUND</button>
+        <button id="startBtn" class="btn" onclick="startSystem()">2. START 70s ALARM</button>
     </div>
     
     <button id="stopBtn" class="btn" onclick="location.reload()">STOP ALARM</button>
 
+    <div class="status" id="stat">Status: Waiting...</div>
+
+    <audio id="silentLoop" src="https://raw.githubusercontent.com/anars/blank-audio/master/10-seconds-of-silence.mp3" loop></audio>
+
     <script>
         var timeLeft = 70;
-        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         var timerId = null;
+        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var silent = document.getElementById('silentLoop');
 
-        // Bypasses the silent switch by generating a raw electronic wave
-        function playTone() {
+        function createTone() {
             var osc = audioCtx.createOscillator();
             var gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-            osc.type = 'square'; // Harsh, loud sound
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch A
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
             gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            osc.start();
             return { osc, gain };
         }
 
         function testTone() {
             audioCtx.resume();
-            var tone = playTone();
-            setTimeout(() => tone.osc.stop(), 500);
+            var t = createTone();
+            t.osc.start();
+            setTimeout(() => t.osc.stop(), 500);
+            document.getElementById('stat').innerText = "Sound Tested!";
         }
 
-        function startAlarm() {
+        function startSystem() {
             audioCtx.resume();
-            document.getElementById('ui').style.display = 'none';
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('stat').innerText = "Bypass Active: App will run even if screen turns off.";
 
-            // Create a "Silent Heartbeat" to keep iOS from sleeping the CPU
-            var silentOsc = audioCtx.createOscillator();
-            var silentGain = audioCtx.createGain();
-            silentGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-            silentOsc.connect(silentGain);
-            silentGain.connect(audioCtx.destination);
-            silentOsc.start();
+            // START SILENT MUSIC IMMEDIATELY
+            // This is the only thing that keeps the iPhone 7 from freezing
+            silent.play();
+
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({ title: "70s Alarm Running" });
+            }
 
             var endTime = Date.now() + (timeLeft * 1000);
 
             timerId = setInterval(() => {
-                var now = Date.now();
-                var remaining = Math.round((endTime - now) / 1000);
+                var remaining = Math.round((endTime - Date.now()) / 1000);
 
                 if (remaining <= 0) {
                     clearInterval(timerId);
@@ -87,11 +89,15 @@
             document.getElementById('timer').style.color = "#FF3B30";
             document.getElementById('stopBtn').style.display = 'block';
             
-            // Continuous beeping loop
+            // Continuous beep loop
             setInterval(() => {
-                var t = playTone();
+                var t = createTone();
+                t.osc.start();
                 setTimeout(() => t.osc.stop(), 200);
             }, 400);
+
+            // Vibrate if available
+            if (navigator.vibrate) navigator.vibrate([500, 500, 500]);
         }
     </script>
 </body>
