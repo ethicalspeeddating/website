@@ -1,65 +1,105 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPhone 7 Alarm</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>5-Min Wake Alarm</title>
+    <link rel="manifest" href="manifest.json">
     <style>
-        body { background: #1a1a1a; color: #fff; text-align: center; font-family: sans-serif; padding-top: 100px; }
-        #timer { font-size: 60px; margin: 20px; color: #00ff00; }
-        button { padding: 30px; font-size: 20px; background: #007AFF; color: white; border: none; border-radius: 15px; }
-        .dot { height: 10px; width: 100px; background-color: #333; margin: auto; border-radius: 5px; }
-        .pulse { background-color: #ff0000; } /* Flashes to show it's working */
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding-top: 80px; }
+        #timer { font-size: 90px; font-weight: bold; margin: 20px; color: #00ff00; transition: color 0.3s; }
+        .btn { padding: 25px; width: 85%; font-size: 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 10px 0; }
+        #startBtn { background: #007AFF; color: white; }
+        #stopBtn { background: #FF3B30; color: white; display: none; }
+        
+        /* iOS "Add to Home Screen" Prompt Style */
+        #ios-prompt {
+            display: none; position: fixed; bottom: 20px; left: 5%; width: 90%;
+            background: #333; color: white; padding: 20px; border-radius: 15px;
+            z-index: 1000; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #ios-prompt b { color: #007AFF; }
+        .alarm-active { background: #500 !important; }
     </style>
 </head>
 <body>
 
-    <div id="setup">
-        <button onclick="startTimer()">START 5-MIN ALARM</button>
-        <p>Keep screen visible after clicking.</p>
+    <div id="timer">05:00</div>
+    <button id="startBtn" class="btn" onclick="startApp()">START ALARM</button>
+    <button id="stopBtn" class="btn" onclick="stopAlarm()">STOP ALARM</button>
+
+    <div id="ios-prompt">
+        Tap the <b>Share icon</b> (square with arrow) and select <b>"Add to Home Screen"</b> to keep this alarm running reliably!
+        <br><br><button onclick="this.parentElement.style.display='none'" style="background:none; border:1px solid #777; color:#fff; border-radius:5px; padding:5px 10px;">Close</button>
     </div>
 
-    <div id="running" style="display:none;">
-        <div id="timer">05:00</div>
-        <div id="indicator" class="dot"></div>
-        <p style="color:#555">App is Active. Do not lock phone.</p>
-    </div>
-
-    <video id="v" playsinline loop muted style="width:1px;height:1px;opacity:0.01;">
+    <video id="v" playsinline loop muted style="position:absolute; width:1px; height:1px; opacity:0.01;">
         <source src="https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-480p-30s/master/video.mp4" type="video/mp4">
     </video>
-    <audio id="a" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+    <audio id="a" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
 
     <script>
         var timeLeft = 300;
+        var timerInterval = null;
         var video = document.getElementById('v');
         var audio = document.getElementById('a');
-        var indicator = document.getElementById('indicator');
+        var timerDisplay = document.getElementById('timer');
+        var startBtn = document.getElementById('startBtn');
+        var stopBtn = document.getElementById('stopBtn');
 
-        function startTimer() {
-            document.getElementById('setup').style.display = 'none';
-            document.getElementById('running').style.display = 'block';
+        // Check if we should show the iOS prompt
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+        if (isIOS && !isStandalone) {
+            document.getElementById('ios-prompt').style.display = 'block';
+        }
 
-            // Start Video (Forces iPhone 7 to stay awake)
+        function startApp() {
+            startBtn.style.display = 'none';
             video.play();
-            
-            // Unlock Audio
-            audio.play(); audio.pause();
+            audio.play(); audio.pause(); // Unlock audio
 
-            setInterval(function() {
-                timeLeft--;
-                
-                // Pulse the indicator so you know it hasn't frozen
-                indicator.classList.toggle('pulse');
-
-                var m = Math.floor(timeLeft / 60);
-                var s = timeLeft % 60;
-                document.getElementById('timer').innerHTML = m + ":" + (s < 10 ? '0' : '') + s;
-
-                if (timeLeft <= 0) {
-                    audio.play();
-                    timeLeft = 300; // Reset to 5 mins
+            timerInterval = setInterval(function() {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    updateDisplay();
+                } else {
+                    triggerAlarm();
                 }
             }, 1000);
+        }
+
+        function updateDisplay() {
+            var m = Math.floor(timeLeft / 60);
+            var s = timeLeft % 60;
+            timerDisplay.innerHTML = m + ":" + (s < 10 ? '0' : '') + s;
+        }
+
+        function triggerAlarm() {
+            timerDisplay.innerHTML = "0:00";
+            timerDisplay.style.color = "#FF3B30";
+            stopBtn.style.display = 'inline-block';
+            document.body.classList.add('alarm-active');
+            audio.play(); // Continuous loop beep
+        }
+
+        function stopAlarm() {
+            audio.pause();
+            audio.currentTime = 0;
+            clearInterval(timerInterval);
+            timeLeft = 300;
+            updateDisplay();
+            timerDisplay.style.color = "#00ff00";
+            stopBtn.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            document.body.classList.remove('alarm-active');
+        }
+
+        // Register Service Worker for Android PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
         }
     </script>
 </body>
