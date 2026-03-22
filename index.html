@@ -4,72 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>70s Pro Alarm</title>
+    <title>70s Nuclear Bypass</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
-        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
-        .btn { padding: 30px; width: 80%; font-size: 24px; border-radius: 25px; border: none; font-weight: bold; cursor: pointer; }
-        #startBtn { background: #007AFF; color: white; }
-        #stopBtn { background: #FF3B30; color: white; display: none; }
-        #status { font-size: 12px; color: #444; margin-top: 20px; }
+        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin: 20px; }
+        .btn { padding: 30px; width: 80%; font-size: 24px; border-radius: 25px; border: none; font-weight: bold; background: #007AFF; color: white; margin: 10px auto; }
+        #stopBtn { background: #FF3B30; display: none; }
+        /* The "Stay Awake" Canvas - Must be technically visible */
+        #c { position: fixed; bottom: 0; right: 0; width: 2px; height: 2px; opacity: 0.1; }
     </style>
 </head>
 <body>
 
     <div id="timer">01:10</div>
-    <button id="startBtn" class="btn" onclick="startBypass()">START ALARM</button>
-    <button id="stopBtn" class="btn" onclick="stopAlarm()">STOP ALARM</button>
-    <div id="status">Bypass: Inactive</div>
+    <button id="startBtn" class="btn" onclick="runNuclearBypass()">START ALARM</button>
+    <button id="stopBtn" class="btn" onclick="location.reload()">STOP ALARM</button>
 
-    <audio id="heartbeat" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" loop></audio>
+    <canvas id="c"></canvas>
     <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
 
     <script>
         var timeLeft = 70;
-        var timerId = null;
-        var heartbeat = document.getElementById('heartbeat');
         var alarm = document.getElementById('alarm');
         var timerText = document.getElementById('timer');
+        var canvas = document.getElementById('c');
+        var ctx = canvas.getContext('2d');
 
-        function startBypass() {
+        function runNuclearBypass() {
             document.getElementById('startBtn').style.display = 'none';
-            document.getElementById('status').innerText = "BYPASS ACTIVE: DO NOT LOCK";
-
-            // 1. Start Silent "Music" Heartbeat (The real bypass)
-            heartbeat.play();
             
-            // 2. Set Media Metadata (Tells iOS this is a high-priority task)
+            // 1. Unlock Audio
+            alarm.play(); alarm.pause();
+
+            // 2. The "GPU Hammer" - Draws a random pixel 60 times a second
+            // This tells the iPhone 7 GPU that the screen content is constantly changing
+            function render() {
+                ctx.fillStyle = "rgb("+Math.random()*255+",0,0)";
+                ctx.fillRect(0,0,2,2);
+                requestAnimationFrame(render);
+            }
+            render();
+
+            // 3. Media Session Heartbeat
             if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({ title: "Keep-Awake Active" });
                 navigator.mediaSession.playbackState = 'playing';
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: "70s Alarm Running",
-                    artist: "Power Bypass"
-                });
             }
 
-            // 3. Start Timer
-            timerId = setInterval(function() {
-                if (timeLeft > 0) {
-                    timeLeft--;
-                    var m = Math.floor(timeLeft / 60);
-                    var s = timeLeft % 60;
-                    timerText.innerText = m + ":" + (s < 10 ? '0' : '') + s;
+            // 4. Robust Timer (Uses actual clock time to prevent "freezing")
+            var startTime = Date.now();
+            var endTime = startTime + (timeLeft * 1000);
+
+            var checkTimer = setInterval(function() {
+                var now = Date.now();
+                var remaining = Math.round((endTime - now) / 1000);
+
+                if (remaining <= 0) {
+                    clearInterval(checkTimer);
+                    triggerAlarm();
                 } else {
-                    trigger();
+                    var m = Math.floor(remaining / 60);
+                    var s = remaining % 60;
+                    timerText.innerText = m + ":" + (s < 10 ? '0' : '') + s;
                 }
-            }, 1000);
+            }, 500);
         }
 
-        function trigger() {
+        function triggerAlarm() {
             timerText.innerText = "0:00";
             timerText.style.color = "#FF3B30";
-            document.getElementById('stopBtn').style.display = 'inline-block';
-            alarm.play(); // Infinite beeping
-            heartbeat.pause(); // Switch from silence to alarm
-        }
-
-        function stopAlarm() {
-            location.reload(); // Hard reset for iPhone 7 stability
+            document.getElementById('stopBtn').style.display = 'block';
+            alarm.play();
         }
     </script>
 </body>
