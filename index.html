@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>70s Gentle Alarm</title>
+    <title>70s Intelligent Alarm</title>
     <style>
         body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
         #timer { font-size: 100px; font-weight: 300; color: #a8e6cf; margin-bottom: 20px; }
@@ -12,26 +12,24 @@
         #startBtn { background: #007AFF; color: white; display: none; }
         #stopBtn { background: #444; color: white; display: none; }
         
-        /* Mandatory Checklist Overlay */
+        /* Checklist Overlay */
         #setup-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
+            background: #000; z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
         }
         .step-card { background: #1c1c1e; padding: 30px; border-radius: 25px; width: 90%; border: 1px solid #333; }
         .checkbox-row { display: flex; align-items: center; justify-content: center; margin: 20px 0; font-size: 18px; }
         input[type="checkbox"] { width: 25px; height: 25px; margin-right: 15px; }
         
-        /* Subtle "I'm Awake" heartbeat */
         #pulse { position: fixed; bottom: 5px; right: 5px; width: 4px; height: 4px; background: #222; border-radius: 50%; }
     </style>
 </head>
 <body>
 
-    <!-- Mandatory Checklist -->
     <div id="setup-overlay">
         <div class="step-card">
-            <h2>iPhone 7 Pre-Flight</h2>
-            <p style="color:#888;">Settings > Display > Auto-Lock</p>
+            <h2>iPhone Configuration</h2>
+            <p style="color:#888; font-size: 14px;">iOS 15 requires manual setup for web alarms:</p>
             <div class="checkbox-row">
                 <input type="checkbox" id="check-lock" onchange="verifySettings()">
                 <label for="check-lock">Auto-Lock is set to <b>"Never"</b></label>
@@ -40,7 +38,7 @@
                 <input type="checkbox" id="check-sound" onchange="verifySettings()">
                 <label for="check-sound">Side Switch is <b>UP</b> (Not Silent)</label>
             </div>
-            <p id="hint" style="font-size: 12px; color: #555;">Check both boxes to enable the Start button.</p>
+            <p id="hint" style="font-size: 12px; color: #555;">These settings prevent the iPhone 7 from sleeping.</p>
         </div>
     </div>
 
@@ -55,39 +53,46 @@
         var timeLeft = 70;
         var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         var silent = document.getElementById('silent');
+        
+        // --- PLATFORM DETECTION ---
+        var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        
+        if (isIOS) {
+            // Show checklist for iPhone users
+            document.getElementById('setup-overlay').style.display = "flex";
+        } else {
+            // Auto-show Start button for Android/Desktop users
+            document.getElementById('startBtn').style.display = "block";
+        }
 
         function verifySettings() {
             var c1 = document.getElementById('check-lock').checked;
             var c2 = document.getElementById('check-sound').checked;
             if (c1 && c2) {
-                document.getElementById('setup-overlay').style.opacity = "0.2";
-                document.getElementById('setup-overlay').style.pointerEvents = "none";
+                document.getElementById('setup-overlay').style.display = "none";
                 document.getElementById('startBtn').style.display = "block";
             }
         }
 
-        function playGentleTone() {
+        function playGentleChime() {
             var osc = audioCtx.createOscillator();
             var gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-            
-            osc.type = 'sine'; // Pure, gentle sound
-            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5 Note
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
 
-            // Fade in and out to avoid sharp "clicks"
             gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.1);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
 
             osc.start();
-            osc.stop(audioCtx.currentTime + 0.6);
+            osc.stop(audioCtx.currentTime + 1);
         }
 
         function startAlarm() {
             audioCtx.resume();
             silent.play();
-            document.getElementById('setup-overlay').style.display = "none";
             document.getElementById('startBtn').style.display = "none";
 
             var endTime = Date.now() + (timeLeft * 1000);
@@ -108,13 +113,12 @@
 
         function triggerAlarm() {
             document.getElementById('timer').innerText = "0:00";
-            document.getElementById('timer').style.color = "#FF9500";
+            document.getElementById('timer').style.color = "#FFB347";
             document.getElementById('stopBtn').style.display = "block";
             
-            // Loop the gentle tone every 1.5 seconds
             setInterval(function() {
-                playGentleTone();
-            }, 1500);
+                playGentleChime();
+            }, 2000);
         }
     </script>
 </body>
