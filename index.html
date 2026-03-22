@@ -1,95 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>70s Audio Bypass</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
-        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
-        .btn { padding: 20px; width: 90%; font-size: 20px; border-radius: 15px; border: none; font-weight: bold; margin: 10px auto; cursor: pointer; }
-        #testBtn { background: #555; color: white; }
-        #startBtn { background: #007AFF; color: white; }
-        #stopBtn { background: #FF3B30; color: white; display: none; }
-        #status { color: #ff9500; font-size: 14px; margin-top: 10px; }
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; padding-top: 50px; }
+        #timer { font-size: 90px; font-weight: bold; color: #00ff00; margin: 20px; }
+        .btn { padding: 25px; width: 85%; font-size: 20px; border-radius: 20px; border: none; font-weight: bold; margin: 10px 0; }
+        #testBtn { background: #444; color: #fff; }
+        #startBtn { background: #007AFF; color: #fff; }
+        #stopBtn { background: #FF3B30; color: #fff; display: none; }
+        .warning { color: #FF9500; padding: 15px; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div id="timer">01:10</div>
 
-    <div id="controls">
-        <button id="testBtn" class="btn" onclick="testSound()">1. TEST SOUND</button>
-        <button id="startBtn" class="btn" onclick="startAlarm()">2. START ALARM</button>
+    <div class="warning">
+        <b>IPHONE 7 RULES:</b><br>
+        1. Flip the side switch <b>UP</b> (No Red showing).<br>
+        2. Turn volume to <b>MAX</b>.
     </div>
-    
-    <button id="stopBtn" class="btn" onclick="location.reload()">STOP & RESET</button>
-    <div id="status">Status: Waiting...</div>
 
-    <audio id="silentLoop" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" loop></audio>
-    <audio id="alarmSnd" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
+    <button id="testBtn" class="btn" onclick="test()">1. TEST SOUND</button>
+    <button id="startBtn" class="btn" onclick="start()">2. START ALARM</button>
+    <button id="stopBtn" class="btn" onclick="location.reload()">STOP ALARM</button>
+
+    <audio id="alarm" src="https://www.soundjay.com/buttons/beep-01a.mp3" loop preload="auto"></audio>
+    <audio id="silent" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" loop></audio>
 
     <script>
-        var timeLeft = 70;
-        var silent = document.getElementById('silentLoop');
-        var alarm = document.getElementById('alarmSnd');
-        var timerText = document.getElementById('timer');
-        var statusText = document.getElementById('status');
+        var timer = 70;
+        var alarm = document.getElementById('alarm');
+        var silent = document.getElementById('silent');
 
-        // Play a quick beep to check volume
-        function testSound() {
-            alarm.play();
-            statusText.innerText = "Beeping... Check your volume!";
-            setTimeout(function() { 
-                alarm.pause(); 
-                alarm.currentTime = 0;
-                statusText.innerText = "Test Done. Now click Start.";
-            }, 1000);
+        function test() {
+            // This "primes" the audio hardware
+            alarm.play().then(function() {
+                setTimeout(function() { 
+                    alarm.pause(); 
+                    alarm.currentTime = 0;
+                    alert("Sound works! If you heard nothing, check your side switch.");
+                }, 1000);
+            }).catch(function(e) { alert("Click again - iOS blocked it."); });
         }
 
-        function startAlarm() {
-            // 1. Immediately play silence. This tricks iOS into 
-            // keeping the audio channel open even when screen turns off.
+        function start() {
+            // Play silent loop immediately to keep the audio channel open
             silent.play();
             
-            // 2. Register Media Session (Essential for Background Audio)
-            if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({ title: "Alarm Active" });
-                navigator.mediaSession.playbackState = 'playing';
-            }
+            document.getElementById('testBtn').style.display = 'none';
+            document.getElementById('startBtn').style.display = 'none';
 
-            document.getElementById('controls').style.display = 'none';
-            statusText.innerText = "ALARM SET. Sound will play at 0:00.";
-
-            // 3. Use real-time clock to avoid drift if the phone sleeps
-            var endTime = Date.now() + (timeLeft * 1000);
-
-            var checkTimer = setInterval(function() {
-                var now = Date.now();
-                var remaining = Math.round((endTime - now) / 1000);
-
+            var endTime = Date.now() + (timer * 1000);
+            
+            var countdown = setInterval(function() {
+                var remaining = Math.round((endTime - Date.now()) / 1000);
+                
                 if (remaining <= 0) {
-                    clearInterval(checkTimer);
-                    triggerAlarm();
+                    clearInterval(countdown);
+                    document.getElementById('timer').innerHTML = "0:00";
+                    document.getElementById('timer').style.color = "red";
+                    document.getElementById('stopBtn').style.display = "block";
+                    silent.pause();
+                    alarm.play(); // This will now work because 'silent' held the channel open
                 } else {
                     var m = Math.floor(remaining / 60);
                     var s = remaining % 60;
-                    timerText.innerText = m + ":" + (s < 10 ? '0' : '') + s;
+                    document.getElementById('timer').innerHTML = m + ":" + (s < 10 ? '0' : '') + s;
                 }
             }, 500);
-        }
-
-        function triggerAlarm() {
-            timerText.innerText = "0:00";
-            timerText.style.color = "#FF3B30";
-            document.getElementById('stopBtn').style.display = 'block';
-            
-            // Swap silence for the alarm
-            silent.pause();
-            alarm.play();
-            
-            if (navigator.vibrate) navigator.vibrate([500, 500, 500]);
         }
     </script>
 </body>
