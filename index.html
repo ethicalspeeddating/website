@@ -4,35 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>5-Min Wake Alarm</title>
-    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Bypass Alarm</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding-top: 80px; }
-        #timer { font-size: 90px; font-weight: bold; margin: 20px; color: #00ff00; transition: color 0.3s; }
-        .btn { padding: 25px; width: 85%; font-size: 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin: 10px 0; }
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
+        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
+        .btn { padding: 25px; width: 80%; font-size: 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; }
         #startBtn { background: #007AFF; color: white; }
         #stopBtn { background: #FF3B30; color: white; display: none; }
         
-        /* iOS "Add to Home Screen" Prompt Style */
-        #ios-prompt {
-            display: none; position: fixed; bottom: 20px; left: 5%; width: 90%;
-            background: #333; color: white; padding: 20px; border-radius: 15px;
-            z-index: 1000; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        /* The Instruction Overlay */
+        #install-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
         }
-        #ios-prompt b { color: #007AFF; }
-        .alarm-active { background: #500 !important; }
+        .instruction-card { background: #1c1c1e; padding: 30px; border-radius: 25px; border: 1px solid #333; width: 90%; max-width: 400px; }
+        .icon-box { font-size: 40px; margin-bottom: 10px; }
+        b { color: #007AFF; }
     </style>
 </head>
 <body>
 
-    <div id="timer">01:00</div>
-    <button id="startBtn" class="btn" onclick="startApp()">START ALARM</button>
-    <button id="stopBtn" class="btn" onclick="stopAlarm()">STOP ALARM</button>
+    <div id="install-overlay">
+        <div class="instruction-card">
+            <div class="icon-box">📲</div>
+            <h2>Install to Bypass Sleep</h2>
+            <p>To keep the alarm running in <b>Low Power Mode</b>, you must add this to your Home Screen:</p>
+            <p>1. Tap the <b>Share icon</b> <br>(square with arrow at bottom)</p>
+            <p>2. Select <b>"Add to Home Screen"</b></p>
+            <p>3. Open the app from your home screen!</p>
+        </div>
+    </div>
 
-    <div id="ios-prompt">
-        Tap the <b>Share icon</b> (square with arrow pointing up) and from the text list select <b>"Add to Home Screen"</b> to keep this alarm running reliably!
-        <br><br><button onclick="this.parentElement.style.display='none'" style="background:none; border:1px solid #777; color:#fff; border-radius:5px; padding:5px 10px;">Close</button>
+    <div id="main-ui">
+        <div id="timer">05:00</div>
+        <button id="startBtn" class="btn" onclick="startAlarm()">START BYPASS ALARM</button>
+        <button id="stopBtn" class="btn" onclick="stopAlarm()">STOP ALARM</button>
     </div>
 
     <video id="v" playsinline loop muted style="position:absolute; width:1px; height:1px; opacity:0.01;">
@@ -41,27 +48,36 @@
     <audio id="a" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
 
     <script>
-        var timeLeft = 300;
-        var timerInterval = null;
-        var video = document.getElementById('v');
-        var audio = document.getElementById('a');
-        var timerDisplay = document.getElementById('timer');
-        var startBtn = document.getElementById('startBtn');
-        var stopBtn = document.getElementById('stopBtn');
+        const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 
-        // Check if we should show the iOS prompt
-        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+        // Show overlay if on iPhone and not installed
         if (isIOS && !isStandalone) {
-            document.getElementById('ios-prompt').style.display = 'block';
+            document.getElementById('install-overlay').style.display = 'flex';
         }
 
-        function startApp() {
-            startBtn.style.display = 'none';
-            video.play();
-            audio.play(); audio.pause(); // Unlock audio
+        let timeLeft = 300;
+        let timerId = null;
+        const v = document.getElementById('v');
+        const a = document.getElementById('a');
 
-            timerInterval = setInterval(function() {
+        function startAlarm() {
+            // Start video loop to bypass Auto-Lock
+            v.play();
+            
+            // Register Media Session to bypass Low Power Mode throttling
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: "Active 5-Min Alarm",
+                    artist: "System Bypass"
+                });
+            }
+
+            // Unlock audio
+            a.play(); a.pause();
+
+            document.getElementById('startBtn').style.display = 'none';
+            timerId = setInterval(() => {
                 if (timeLeft > 0) {
                     timeLeft--;
                     updateDisplay();
@@ -72,34 +88,20 @@
         }
 
         function updateDisplay() {
-            var m = Math.floor(timeLeft / 60);
-            var s = timeLeft % 60;
-            timerDisplay.innerHTML = m + ":" + (s < 10 ? '0' : '') + s;
+            const m = Math.floor(timeLeft / 60);
+            const s = timeLeft % 60;
+            document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
         function triggerAlarm() {
-            timerDisplay.innerHTML = "0:00";
-            timerDisplay.style.color = "#FF3B30";
-            stopBtn.style.display = 'inline-block';
-            document.body.classList.add('alarm-active');
-            audio.play(); // Continuous loop beep
+            document.getElementById('timer').innerText = "0:00";
+            document.getElementById('timer').style.color = "#FF3B30";
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            a.play(); // Infinite loop
         }
 
         function stopAlarm() {
-            audio.pause();
-            audio.currentTime = 0;
-            clearInterval(timerInterval);
-            timeLeft = 300;
-            updateDisplay();
-            timerDisplay.style.color = "#00ff00";
-            stopBtn.style.display = 'none';
-            startBtn.style.display = 'inline-block';
-            document.body.classList.remove('alarm-active');
-        }
-
-        // Register Service Worker for Android PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+            location.reload(); // Quickest way to reset the bypass and stop sound
         }
     </script>
 </body>
