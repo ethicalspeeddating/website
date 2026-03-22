@@ -1,71 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lite Timer</title>
-    <link rel="manifest" href="manifest.json">
+    <title>iPhone 7 Alarm</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; padding-top: 20%; }
-        #timer { font-size: 80px; font-weight: bold; margin: 20px 0; }
-        button { padding: 20px 40px; font-size: 20px; border-radius: 15px; border: none; background: #007AFF; color: white; }
-        #status { color: #888; margin-top: 10px; }
+        body { background: #1a1a1a; color: #fff; text-align: center; font-family: sans-serif; padding-top: 100px; }
+        #timer { font-size: 60px; margin: 20px; color: #00ff00; }
+        button { padding: 30px; font-size: 20px; background: #007AFF; color: white; border: none; border-radius: 15px; }
+        .dot { height: 10px; width: 100px; background-color: #333; margin: auto; border-radius: 5px; }
+        .pulse { background-color: #ff0000; } /* Flashes to show it's working */
     </style>
 </head>
 <body>
 
     <div id="setup">
-        <input type="number" id="mins" value="5" style="font-size:30px; width:60px; text-align:center;"> Mins<br><br>
-        <button id="startBtn">START ALARM</button>
+        <button onclick="startTimer()">START 5-MIN ALARM</button>
+        <p>Keep screen visible after clicking.</p>
     </div>
 
-    <div id="display" style="display:none;">
+    <div id="running" style="display:none;">
         <div id="timer">05:00</div>
-        <div id="status">Screen Lock Active</div>
+        <div id="indicator" class="dot"></div>
+        <p style="color:#555">App is Active. Do not lock phone.</p>
     </div>
 
-    <video id="wakeVideo" playsinline loop muted style="position:absolute; width:1px; height:1px; opacity:0.01;">
+    <video id="v" playsinline loop muted style="width:1px;height:1px;opacity:0.01;">
         <source src="https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-480p-30s/master/video.mp4" type="video/mp4">
     </video>
-    <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+    <audio id="a" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
     <script>
-        const startBtn = document.getElementById('startBtn');
-        const timerText = document.getElementById('timer');
-        const video = document.getElementById('wakeVideo');
-        const audio = document.getElementById('alarm');
+        var timeLeft = 300;
+        var video = document.getElementById('v');
+        var audio = document.getElementById('a');
+        var indicator = document.getElementById('indicator');
 
-        let timeLeft = 0;
-
-        startBtn.onclick = () => {
-            timeLeft = document.getElementById('mins').value * 60;
+        function startTimer() {
             document.getElementById('setup').style.display = 'none';
-            document.getElementById('display').style.display = 'block';
+            document.getElementById('running').style.display = 'block';
 
-            // 1. Force the video and audio to "Unlock"
-            video.play().catch(e => console.log("Video wait"));
+            // Start Video (Forces iPhone 7 to stay awake)
+            video.play();
+            
+            // Unlock Audio
             audio.play(); audio.pause();
 
-            // 2. Simple Wake Lock (If supported)
-            if (navigator.wakeLock) {
-                navigator.wakeLock.request('screen').catch(() => {});
-            }
-
-            // 3. The Countdown (Separated so it doesn't freeze)
-            const countdown = setInterval(() => {
+            setInterval(function() {
                 timeLeft--;
                 
-                const m = Math.floor(timeLeft / 60);
-                const s = timeLeft % 60;
-                timerText.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                // Pulse the indicator so you know it hasn't frozen
+                indicator.classList.toggle('pulse');
+
+                var m = Math.floor(timeLeft / 60);
+                var s = timeLeft % 60;
+                document.getElementById('timer').innerHTML = m + ":" + (s < 10 ? '0' : '') + s;
 
                 if (timeLeft <= 0) {
                     audio.play();
-                    timeLeft = document.getElementById('mins').value * 60; // Reset
-                    if (navigator.vibrate) navigator.vibrate(500);
+                    timeLeft = 300; // Reset to 5 mins
                 }
             }, 1000);
-        };
+        }
     </script>
 </body>
 </html>
