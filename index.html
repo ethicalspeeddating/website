@@ -4,56 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>70s Nuclear Bypass</title>
+    <title>70s Audio Bypass</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin: 20px; }
-        .btn { padding: 30px; width: 80%; font-size: 24px; border-radius: 25px; border: none; font-weight: bold; background: #007AFF; color: white; margin: 10px auto; }
-        #stopBtn { background: #FF3B30; display: none; }
-        /* The "Stay Awake" Canvas - Must be technically visible */
-        #c { position: fixed; bottom: 0; right: 0; width: 2px; height: 2px; opacity: 0.1; }
+        body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
+        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
+        .btn { padding: 20px; width: 90%; font-size: 20px; border-radius: 15px; border: none; font-weight: bold; margin: 10px auto; cursor: pointer; }
+        #testBtn { background: #555; color: white; }
+        #startBtn { background: #007AFF; color: white; }
+        #stopBtn { background: #FF3B30; color: white; display: none; }
+        #status { color: #ff9500; font-size: 14px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div id="timer">01:10</div>
-    <button id="startBtn" class="btn" onclick="runNuclearBypass()">START ALARM</button>
-    <button id="stopBtn" class="btn" onclick="location.reload()">STOP ALARM</button>
 
-    <canvas id="c"></canvas>
-    <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
+    <div id="controls">
+        <button id="testBtn" class="btn" onclick="testSound()">1. TEST SOUND</button>
+        <button id="startBtn" class="btn" onclick="startAlarm()">2. START ALARM</button>
+    </div>
+    
+    <button id="stopBtn" class="btn" onclick="location.reload()">STOP & RESET</button>
+    <div id="status">Status: Waiting...</div>
+
+    <audio id="silentLoop" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" loop></audio>
+    <audio id="alarmSnd" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" loop></audio>
 
     <script>
         var timeLeft = 70;
-        var alarm = document.getElementById('alarm');
+        var silent = document.getElementById('silentLoop');
+        var alarm = document.getElementById('alarmSnd');
         var timerText = document.getElementById('timer');
-        var canvas = document.getElementById('c');
-        var ctx = canvas.getContext('2d');
+        var statusText = document.getElementById('status');
 
-        function runNuclearBypass() {
-            document.getElementById('startBtn').style.display = 'none';
+        // Play a quick beep to check volume
+        function testSound() {
+            alarm.play();
+            statusText.innerText = "Beeping... Check your volume!";
+            setTimeout(function() { 
+                alarm.pause(); 
+                alarm.currentTime = 0;
+                statusText.innerText = "Test Done. Now click Start.";
+            }, 1000);
+        }
+
+        function startAlarm() {
+            // 1. Immediately play silence. This tricks iOS into 
+            // keeping the audio channel open even when screen turns off.
+            silent.play();
             
-            // 1. Unlock Audio
-            alarm.play(); alarm.pause();
-
-            // 2. The "GPU Hammer" - Draws a random pixel 60 times a second
-            // This tells the iPhone 7 GPU that the screen content is constantly changing
-            function render() {
-                ctx.fillStyle = "rgb("+Math.random()*255+",0,0)";
-                ctx.fillRect(0,0,2,2);
-                requestAnimationFrame(render);
-            }
-            render();
-
-            // 3. Media Session Heartbeat
+            // 2. Register Media Session (Essential for Background Audio)
             if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({ title: "Keep-Awake Active" });
+                navigator.mediaSession.metadata = new MediaMetadata({ title: "Alarm Active" });
                 navigator.mediaSession.playbackState = 'playing';
             }
 
-            // 4. Robust Timer (Uses actual clock time to prevent "freezing")
-            var startTime = Date.now();
-            var endTime = startTime + (timeLeft * 1000);
+            document.getElementById('controls').style.display = 'none';
+            statusText.innerText = "ALARM SET. Sound will play at 0:00.";
+
+            // 3. Use real-time clock to avoid drift if the phone sleeps
+            var endTime = Date.now() + (timeLeft * 1000);
 
             var checkTimer = setInterval(function() {
                 var now = Date.now();
@@ -74,7 +84,12 @@
             timerText.innerText = "0:00";
             timerText.style.color = "#FF3B30";
             document.getElementById('stopBtn').style.display = 'block';
+            
+            // Swap silence for the alarm
+            silent.pause();
             alarm.play();
+            
+            if (navigator.vibrate) navigator.vibrate([500, 500, 500]);
         }
     </script>
 </body>
