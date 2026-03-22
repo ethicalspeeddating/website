@@ -4,88 +4,94 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>70s Sound Bypass</title>
+    <title>70s Synth Alarm</title>
     <style>
         body { background: #000; color: #fff; text-align: center; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; justify-content: center; }
-        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 10px; }
+        #timer { font-size: 100px; font-weight: bold; color: #34C759; margin-bottom: 20px; }
         .btn { padding: 25px; width: 90%; font-size: 20px; border-radius: 20px; border: none; font-weight: bold; margin: 10px auto; cursor: pointer; }
         #testBtn { background: #444; color: white; }
         #startBtn { background: #007AFF; color: white; }
         #stopBtn { background: #FF3B30; color: white; display: none; }
-        .step { color: #888; font-size: 14px; margin-bottom: 5px; }
-        .red-alert { color: #ff3b30 !important; }
+        #install-note { background: #1c1c1e; padding: 15px; border-radius: 15px; font-size: 13px; color: #888; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
     <div id="timer">01:10</div>
 
-    <div id="setup">
-        <div class="step">Step 1: Verify Hardware</div>
-        <button id="testBtn" class="btn" onclick="primeAndTest()">TEST LOUD BEEP</button>
-        
-        <div class="step">Step 2: Launch Timer</div>
-        <button id="startBtn" class="btn" onclick="startSystem()">START 70s ALARM</button>
+    <div id="ui">
+        <div id="install-note">
+            <b>REQUIRED:</b> Tap <b>Share</b> > <b>Add to Home Screen</b>. <br>The alarm will NOT work inside the Safari app.
+        </div>
+        <button id="testBtn" class="btn" onclick="testTone()">1. TEST LOUD TONE</button>
+        <button id="startBtn" class="btn" onclick="startAlarm()">2. START 70s TIMER</button>
     </div>
     
     <button id="stopBtn" class="btn" onclick="location.reload()">STOP ALARM</button>
 
-    <p id="msg" style="color:#555; font-size:12px;">Ensure Side Switch is UP (No Red)</p>
-
-    <audio id="alarmSnd" src="https://www.soundjay.com/buttons/beep-01a.mp3" loop preload="auto"></audio>
-    <audio id="silentSnd" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" loop></audio>
-
     <script>
-        var timerLength = 70;
-        var alarm = document.getElementById('alarmSnd');
-        var silent = document.getElementById('silentSnd');
-        var timerDisplay = document.getElementById('timer');
+        var timeLeft = 70;
+        var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var timerId = null;
 
-        // Step 1: Force the audio hardware to turn on
-        function primeAndTest() {
-            // iOS requires audio play inside a click handler
-            alarm.play().then(function() {
-                setTimeout(function() {
-                    alarm.pause();
-                    alarm.currentTime = 0;
-                }, 1000);
-            }).catch(function() {
-                alert("STILL BLOCKED: Check your side mute switch and volume!");
-            });
+        // Bypasses the silent switch by generating a raw electronic wave
+        function playTone() {
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'square'; // Harsh, loud sound
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch A
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            osc.start();
+            return { osc, gain };
         }
 
-        // Step 2: Start the bypass
-        function startSystem() {
-            // Play silence IMMEDIATELY to hold the audio channel open
-            silent.play();
+        function testTone() {
+            audioCtx.resume();
+            var tone = playTone();
+            setTimeout(() => tone.osc.stop(), 500);
+        }
 
-            if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({ title: "Bypass Active" });
-            }
+        function startAlarm() {
+            audioCtx.resume();
+            document.getElementById('ui').style.display = 'none';
 
-            document.getElementById('setup').style.display = 'none';
-            document.getElementById('msg').innerText = "Running... Keep app open.";
+            // Create a "Silent Heartbeat" to keep iOS from sleeping the CPU
+            var silentOsc = audioCtx.createOscillator();
+            var silentGain = audioCtx.createGain();
+            silentGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+            silentOsc.connect(silentGain);
+            silentGain.connect(audioCtx.destination);
+            silentOsc.start();
 
-            var endAt = Date.now() + (timerLength * 1000);
+            var endTime = Date.now() + (timeLeft * 1000);
 
-            var loop = setInterval(function() {
-                var diff = Math.round((endAt - Date.now()) / 1000);
+            timerId = setInterval(() => {
+                var now = Date.now();
+                var remaining = Math.round((endTime - now) / 1000);
 
-                if (diff <= 0) {
-                    clearInterval(loop);
-                    timerDisplay.innerText = "0:00";
-                    timerDisplay.className = "red-alert";
-                    document.getElementById('stopBtn').style.display = 'block';
-                    
-                    // The "Silent to Loud" swap
-                    silent.pause();
-                    alarm.play(); 
+                if (remaining <= 0) {
+                    clearInterval(timerId);
+                    triggerAlarm();
                 } else {
-                    var m = Math.floor(diff / 60);
-                    var s = diff % 60;
-                    timerDisplay.innerText = m + ":" + (s < 10 ? '0' : '') + s;
+                    var m = Math.floor(remaining / 60);
+                    var s = remaining % 60;
+                    document.getElementById('timer').innerText = m + ":" + (s < 10 ? '0' : '') + s;
                 }
             }, 500);
+        }
+
+        function triggerAlarm() {
+            document.getElementById('timer').innerText = "0:00";
+            document.getElementById('timer').style.color = "#FF3B30";
+            document.getElementById('stopBtn').style.display = 'block';
+            
+            // Continuous beeping loop
+            setInterval(() => {
+                var t = playTone();
+                setTimeout(() => t.osc.stop(), 200);
+            }, 400);
         }
     </script>
 </body>
